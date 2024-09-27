@@ -182,7 +182,7 @@ if 'note_audio_bytes' not in st.session_state:
     st.session_state['note_audio_bytes'] = None
 
 if 'note_audio_text' not in st.session_state:
-    st.session_state['note_audio_text'] = ""
+    st.session_state['note_audio_text'] = None
 
 # Uzytkownik nagrywa swoja wiadomosc
 st.title('Nagraj wiadomosc')
@@ -198,9 +198,6 @@ if note_audio:
     st.session_state['note_audio_bytes'] = audio.getvalue()
     st.audio(st.session_state['note_audio_bytes'], format='audio/mp3')
 
-    if st.button('Zatwierdz wiadomosc'):
-        st.session_state['note_audio_text'] = transcribe_audio(st.session_state['note_audio_bytes'])
-
     if st.session_state['note_audio_text']:
         st.text_area(
             'Jesli twoje informacje nie sa kompletne, nagraj sie jeszcze raz:',
@@ -208,12 +205,11 @@ if note_audio:
             disabled=True,
         )
 
+    if st.button('Zatwierdz wiadomosc'):
+        st.session_state['note_audio_text'] = transcribe_audio(st.session_state['note_audio_bytes'])
+
 # Jesli uzytkownik zatwierdzil wiadomosc, wyciagamy z niej wszystkie soki
-if 'note_audio_text' in st.session_state['note_audio_text']:
-    audio_file = st.session_state['note_audio_bytes']
-    audio_file.seek(0)
-    base64_audio = base64.b64encode(audio_file).decode('utf-8')
-    user_input = base64_audio
+if 'note_audio_text' in st.session_state and st.session_state['note_audio_text'] is not None:
 
     # Definicja modelu uzytkownika
     class PersonInfo(BaseModel):
@@ -231,29 +227,36 @@ if 'note_audio_text' in st.session_state['note_audio_text']:
         Poniżej znajduje się przykładowa wypowiedź, z której należy wyciągnąć informacje.
         Wyciągnij wiek, płeć, poziom wykształcenia, ulubione miejsce i ulubione zwierzę.
         Wedlug nastepujacych kryteriow:
-        age = ['<18', '18-24', '25-34', '35-44', '45-54', '55-64', '>=65']
-        edu_level = ['Podstawowe', 'Średnie', 'Wyższe']
-        fav_animals = ['Brak ulubionych', 'Psy', 'Koty', 'Koty i psy', 'Inne']
-        fav_place = ['Nad wodą', 'W górach', 'W lesie', 'Inne']
-        gender = ['Mężczyzna', 'Kobieta']<user_text>
-        Mam na imię Rafał, mam 55 lat. Mam tez psa i najchętniej spędzam z nim czas w lesie.
+        wiek postaraj sie przypisac do 1 z nastepujacych kategorii:
+        ['<18', '18-24', '25-34', '35-44', '45-54', '55-64', '>=65'], a nastepnie zapisz go do pola 'age'
+        Wyksztalcenie postaraj sie przypisac do 1 z nastepujacych kategorii:
+        ['Podstawowe', 'Średnie', 'Wyższe'], a nastepnie zapisz go do pola 'edu_level'
+        Ulubione zwierze postaraj sie przypisac do 1 z nastepujacych kategorii:
+        ['Brak ulubionych', 'Psy', 'Koty', 'Koty i psy', 'Inne'], a nastepnie zapisz go do pola 'fav_animals'
+        Ulubione miejsce postaraj sie przypisac do 1 z nastepujacych kategorii:
+        ['Nad wodą', 'W górach', 'W lesie', 'Inne'], a nastepnie zapisz go do pola 'fav_place'
+        Płeć przypisz do 1 z nastepujacych kategorii:
+        ['Mężczyzna', 'Kobieta'], a nastepnie zapisz go do pola 'gender'.
+
+        Przykladowa wypowiedz:
+        <user_text>
+        Mam na imię Rafał, żyję już od poł wieku i czterech lat. Mam psa i lubię z nim spacerować po lesie.
         <user_text/>
 
+        Przykladowe dane do wyciagniecia:
         <expected_data>
-        - age: '55-64'
-        - edu_level: NaN
-        - fav_place: 'W lesie'
-        - fav_animals: 'Psy'
-        - gender: 'Mężczyzna'
+        {
+        "age": "45-55"
+        "edu_level": "NaN"
+        "fav_place": "W lesie"
+        "fav_animals": "Psy"
+        "gender": "Mężczyzna"
+        }
         <expected_data/>
     """
 
-    # # user_input = st.session_state['note_audio_text']
-    # user_input = """
-    #     Cześć, jestem Andrzej. Mam 33 lata. Uwielbiam góry, a moje ulubione zwierzę to kot.
-    #     Jestem po studiach. Uwielbiam programować.
-    # """
-    user_input = base64_audio
+    audio_text = st.session_state['note_audio_text']
+    user_input = audio_text
 
     user_info = instructor_openai_client.chat.completions.create(
         model="gpt-4o-mini",
@@ -267,8 +270,7 @@ if 'note_audio_text' in st.session_state['note_audio_text']:
     user_data = user_info.model_dump()
 
     # Wyświetlenie informacji o użytkowniku
-    print(user_data)
-
+    st.write(user_data)
 
 model = get_model()
 all_df = get_all_participant()
