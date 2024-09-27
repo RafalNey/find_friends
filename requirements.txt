@@ -7,5 +7,5 @@ openai==1.47.0
 pydantic==2.9.2
 pycaret
 python-dotenv
-audiorecorder
+streamlit-audiorecorder
 pydantic_core==2.23.4
