@@ -115,44 +115,6 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# --------------------------------------------
-#                     PASEK BOCZNY
-# --------------------------------------------
-
-with st.sidebar:
-    # Tytul na pasku bocznym
-    st.markdown('''
-        <div style="text-align: center">
-        <h1 style="font-size: 24px; margin: 0;">Meet friends in Data Scientists course based on the welcome survey</h1>
-        </div>
-        ''', unsafe_allow_html=True)
-
-    st.header('Opowiedz nam coś o sobie')
-    st.markdown('Pomozemy Ci znalezc osoby, które mają podobne do Twoich zainteresowania')
-
-    age = st.selectbox('Wiek', ['<18', '18-24', '25-34', '35-44', '45-54', '55-64', '>=65'])
-    edu_level = st.selectbox('Wykształcenie', ['Podstawowe', 'Średnie', 'Wyższe'])
-    fav_animals = st.selectbox('Ulubione zwierzęta', ['Brak ulubionych', 'Psy', 'Koty', 'Koty i psy', 'Inne'])
-    fav_place = st.selectbox('Ulubione miejsce', ['Nad wodą', 'W górach', 'W lesie', 'Inne'])
-    gender = st.radio('Płeć', ['Mężczyzna', 'Kobieta'])
-
-    # Zbieranie danych do DataFrame
-    person_df = pd.DataFrame([{
-        'age': age,
-        'edu_level': edu_level,
-        'fav_animals': fav_animals,
-        'fav_place': fav_place,
-        'gender': gender,
-    }])
-
-    # Przewidywanie klastra na podstawie aktualnych danych
-    model = get_model()
-    cluster_data = predict_model(model, data=person_df)
-
-    st.session_state['predicted_cluster_id'] = cluster_data['Cluster'].values[0]
-    cluster_names_and_descriptions = get_cluster_names_descriptions()
-    predicted_cluster_data = cluster_names_and_descriptions[st.session_state['predicted_cluster_id']]
-
 
 # --------------------------------------------
 #                     EKRAN GŁÓWNY
@@ -341,3 +303,47 @@ if 'note_audio_text' in st.session_state and st.session_state['note_audio_text']
         yaxis_title='Liczba osob',
     )
     st.plotly_chart(fig)
+
+# --------------------------------------------
+#                     PASEK BOCZNY
+# --------------------------------------------
+
+    with st.sidebar:
+        # Tytul na pasku bocznym
+        st.markdown('''
+            <div style="text-align: center">
+            <h1 style="font-size: 24px; margin: 0;">Meet friends in Data Scientists course
+            based on the welcome survey</h1>
+            </div>
+            ''', unsafe_allow_html=True)
+
+        st.markdown('Jeśli chcesz, możesz coś zmienić w poniższych ustawieniach, żeby zobaczyć, co z tego wyniknie')
+
+        age = st.selectbox('Wiek', ['<18', '18-24', '25-34', '35-44', '45-54', '55-64', '>=65'])
+        edu_level = st.selectbox('Wykształcenie', ['Podstawowe', 'Średnie', 'Wyższe'])
+        fav_animals = st.selectbox('Ulubione zwierzęta', ['Brak ulubionych', 'Psy', 'Koty', 'Koty i psy', 'Inne'])
+        fav_place = st.selectbox('Ulubione miejsce', ['Nad wodą', 'W górach', 'W lesie', 'Inne'])
+        gender = st.radio('Płeć', ['Mężczyzna', 'Kobieta'])
+
+        # Zbieranie danych do DataFrame
+        st.session_state['person_df'] = pd.DataFrame([{
+            'age': age,
+            'edu_level': edu_level,
+            'fav_animals': fav_animals,
+            'fav_place': fav_place,
+            'gender': gender,
+        }])
+
+        # Przewidywanie klastra na podstawie aktualnych danych
+        cluster_data = predict_model(model, data=st.session_state['person_df'])
+
+        st.session_state['predicted_cluster_id'] = cluster_data['Cluster'].values[0]
+        predicted_cluster_data = cluster_names_and_descriptions[st.session_state['predicted_cluster_id']]
+
+        # Przewidywanie klastra na podstawie aktualnych danych
+        model = get_model()
+        cluster_data = predict_model(model, data=person_df)
+
+        st.session_state['predicted_cluster_id'] = cluster_data['Cluster'].values[0]
+        cluster_names_and_descriptions = get_cluster_names_descriptions()
+        predicted_cluster_data = cluster_names_and_descriptions[st.session_state['predicted_cluster_id']]
