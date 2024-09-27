@@ -6,3 +6,6 @@ openai
 pydantic
 pycaret
 dotenv
+json
+base64
+audiorecorder
