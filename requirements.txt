@@ -9,3 +9,4 @@ dotenv
 json
 base64
 audiorecorder
+pydantic_core==2.23.4
