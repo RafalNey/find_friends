@@ -215,7 +215,7 @@ if 'note_audio_text' in st.session_state and st.session_state['note_audio_text']
     class PersonInfo(BaseModel):
         age: str
         edu_level: str
-        fav_animal: str
+        fav_animals: str
         fav_place: str
         gender: str
 
@@ -269,61 +269,75 @@ if 'note_audio_text' in st.session_state and st.session_state['note_audio_text']
 
     user_data = user_info.model_dump()
 
-    # Wyświetlenie informacji o użytkowniku
-    st.write(user_data)
+    # Zbieranie danych do DataFrame
+    person_df = pd.DataFrame([{
+        'age': user_data['age'],
+        'edu_level': user_data['edu_level'],
+        'fav_animals': user_data['fav_animals'],
+        'fav_place': user_data['fav_place'],
+        'gender': user_data['gender'],
+    }])
 
-model = get_model()
-all_df = get_all_participant()
-cluster_names_and_descriptions = get_cluster_names_descriptions()
+    model = get_model()
+    all_df = get_all_participant()
+    cluster_names_and_descriptions = get_cluster_names_descriptions()
 
-predicted_cluster_id = predict_model(model, data=person_df)['Cluster'].values[0]
-predicted_cluster_data = cluster_names_and_descriptions[predicted_cluster_id]
+    predicted_cluster_id = predict_model(model, data=person_df)['Cluster'].values[0]
+    predicted_cluster_data = cluster_names_and_descriptions[predicted_cluster_id]
 
-st.title(f'Najblizej ci do grupy: {predicted_cluster_data["name"]}')
-st.markdown(predicted_cluster_data['description'])
+    st.title(f'Najbliżej ci do grupy:    {predicted_cluster_data["name"]}')
+    st.markdown(predicted_cluster_data['description'])
 
-st.image(PICTURE)
+    mowa_pozegnalna = f'''
+        Z tego, co widzę, najbliżej ci do grupy {predicted_cluster_data["name"]}.
+        {predicted_cluster_data['description']}
+        Jestem pewny, że wśród nich poznasz swoją bratnią duszę.
+    '''
 
-same_cluster_df = all_df[all_df['Cluster'] == predicted_cluster_id]
-st.metric('Liczba Twoich znajomych', len(same_cluster_df))
+    st.image(PICTURE)
+    audio_file = text_to_audio(client, mowa_pozegnalna)
+    auto_play_audio(audio_file)
 
-st.header('Osoby z grupy')
-fig = px.histogram(same_cluster_df.sort_values('age'), x='age')
-fig.update_layout(
-    title='Rozklad wieku w grupie',
-    xaxis_title='Wiek',
-    yaxis_title='Liczba osob',
-)
-st.plotly_chart(fig)
+    same_cluster_df = all_df[all_df['Cluster'] == predicted_cluster_id]
+    st.metric('Liczba Twoich znajomych', len(same_cluster_df))
 
-fig = px.histogram(same_cluster_df.sort_values('edu_level'), x='edu_level')
-fig.update_layout(
-    title='Rozklad wyksztalcenia w grupie',
-    xaxis_title='Wyksztalcenie',
-    yaxis_title='Liczba osob',
-)
-st.plotly_chart(fig)
+    st.header('Osoby z grupy')
+    fig = px.histogram(same_cluster_df.sort_values('age'), x='age')
+    fig.update_layout(
+        title='Rozklad wieku w grupie',
+        xaxis_title='Wiek',
+        yaxis_title='Liczba osob',
+    )
+    st.plotly_chart(fig)
 
-fig = px.histogram(same_cluster_df.sort_values('fav_animals'), x='fav_animals')
-fig.update_layout(
-    title='Rozklad ulubionych zwierzat w grupie',
-    xaxis_title='Ulubione zwierzeta',
-    yaxis_title='Liczba osob',
-)
-st.plotly_chart(fig)
+    fig = px.histogram(same_cluster_df.sort_values('edu_level'), x='edu_level')
+    fig.update_layout(
+        title='Rozklad wyksztalcenia w grupie',
+        xaxis_title='Wyksztalcenie',
+        yaxis_title='Liczba osob',
+    )
+    st.plotly_chart(fig)
 
-fig = px.histogram(same_cluster_df.sort_values('fav_place'), x='fav_place')
-fig.update_layout(
-    title='Rozklad ulubionych miejsc w grupie',
-    xaxis_title='Ulubione miejsce',
-    yaxis_title='Liczba osob',
-)
-st.plotly_chart(fig)
+    fig = px.histogram(same_cluster_df.sort_values('fav_animals'), x='fav_animals')
+    fig.update_layout(
+        title='Rozklad ulubionych zwierzat w grupie',
+        xaxis_title='Ulubione zwierzeta',
+        yaxis_title='Liczba osob',
+    )
+    st.plotly_chart(fig)
 
-fig = px.histogram(same_cluster_df.sort_values('gender'), x='gender')
-fig.update_layout(
-    title='Rozklad plci w grupie',
-    xaxis_title='Plec',
-    yaxis_title='Liczba osob',
-)
-st.plotly_chart(fig)
+    fig = px.histogram(same_cluster_df.sort_values('fav_place'), x='fav_place')
+    fig.update_layout(
+        title='Rozklad ulubionych miejsc w grupie',
+        xaxis_title='Ulubione miejsce',
+        yaxis_title='Liczba osob',
+    )
+    st.plotly_chart(fig)
+
+    fig = px.histogram(same_cluster_df.sort_values('gender'), x='gender')
+    fig.update_layout(
+        title='Rozklad plci w grupie',
+        xaxis_title='Plec',
+        yaxis_title='Liczba osob',
+    )
+    st.plotly_chart(fig)
