@@ -2,6 +2,7 @@ instructor
 plotly
 streamlit
 pandas
+pyaudio
 openai==1.47.0
 pydantic==2.9.2
 pycaret
