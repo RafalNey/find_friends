@@ -3,7 +3,7 @@ plotly
 streamlit
 pandas
 pyaudio
-openai==1.47.0
+openai
 pydantic==2.9.2
 pycaret
 python-dotenv
