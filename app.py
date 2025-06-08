@@ -1,4 +1,5 @@
 # Sekcja importowa
+import os
 import json
 import base64
 import instructor
@@ -13,9 +14,35 @@ from dotenv import dotenv_values
 from audiorecorder import audiorecorder
 from pycaret.clustering import load_model, predict_model
 
+# sekcja do obslugi AWS SSM Parameter Store
+import boto3
+from botocore.exceptions import ClientError
+
+
+def get_openai_key():
+    ssm = boto3.client('ssm', region_name='eu-north-1')
+    try:
+        response = ssm.get_parameter(
+            Name='/find_friends/openai_api_key',
+            WithDecryption=True
+        )
+        return response['Parameter']['Value']
+    except ClientError as e:
+        st.error(f"Nie można pobrać klucza OpenAI: {e}")
+        return None
+
 
 # Tajny plik z kluczem (TYLKO lokalnie! Do testow przed wypuszczeniem w sina dal...)
 env = dotenv_values('.env')
+
+# Inicjalizacja OpenAI API z serwera AWS
+openai_key = get_openai_key()
+
+if openai_key is None:
+    st.error("Brak klucza OpenAI. Aplikacja nie może działać.")
+else:
+    client = OpenAI(api_key=openai_key)
+    # teraz korzystasz z klienta, np. client.chat.completions.create(...)
 
 # Zmienne configurujace
 AUDIO_TRANSCRIBE_MODEL = 'whisper-1'
@@ -95,14 +122,20 @@ def auto_play_audio(audio_file):
 
 
 # Ladujemy OpenAI API key od uzytkownika
-if not st.session_state.get('openai_api_key'):
-    if 'OPENAI_API_KEY' in env:
-        st.session_state['openai_api_key'] = env['OPENAI_API_KEY']
+if 'openai_api_key' not in st.session_state:
+    # najpierw próbujemy pobrać klucz z SSM
+    ssm_key = get_openai_key()
+    if ssm_key:
+        st.session_state['openai_api_key'] = ssm_key
     else:
-        st.info('Dodaj swoj klucz API OpenAI, by moc korzystac z tej aplikacji')
-        st.session_state['openai_api_key'] = st.text_input('Klucz API', type='password')
-        if st.session_state['openai_api_key']:
-            st.rerun()
+        # fallback na zmienną środowiskową lub ręczne podanie
+        if 'OPENAI_API_KEY' in os.environ:
+            st.session_state['openai_api_key'] = os.environ['OPENAI_API_KEY']
+        else:
+            st.info('Dodaj swój klucz API OpenAI, by móc korzystać z tej aplikacji')
+            st.session_state['openai_api_key'] = st.text_input('Klucz API', type='password')
+            if st.session_state['openai_api_key']:
+                st.experimental_rerun()
 
 if not st.session_state.get('openai_api_key'):
     st.stop()
@@ -171,8 +204,13 @@ if note_audio:
         st.session_state['note_audio_text'] = transcribe_audio(st.session_state['note_audio_bytes'])
 
 # Jesli uzytkownik zatwierdzil wiadomosc, wyciagamy z niej wszystkie soki
-if 'note_audio_text' in st.session_state and st.session_state['note_audio_text'] is not None:
-
+# if 'note_audio_text' in st.session_state and st.session_state['note_audio_text'] is not None:
+# tylko raz po zakończeniu głosowej transkrypcji ustaw active source na 'audio'
+if (
+    'note_audio_text' in st.session_state
+    and st.session_state['note_audio_text'] is not None
+    and 'person_df' not in st.session_state
+):
     # Definicja modelu uzytkownika
     class PersonInfo(BaseModel):
         age: str
@@ -239,7 +277,12 @@ if 'note_audio_text' in st.session_state and st.session_state['note_audio_text']
         'fav_place': user_data['fav_place'],
         'gender': user_data['gender'],
     }])
+    st.session_state['person_df'] = person_df
+    st.session_state['user_input_source'] = 'audio'
 
+# wyświetlamy wyniki, jeśli już mamy person_df
+if 'person_df' in st.session_state:
+    person_df = st.session_state['person_df']
     model = get_model()
     all_df = get_all_participant()
     cluster_names_and_descriptions = get_cluster_names_descriptions()
@@ -325,25 +368,31 @@ if 'note_audio_text' in st.session_state and st.session_state['note_audio_text']
         fav_place = st.selectbox('Ulubione miejsce', ['Nad wodą', 'W górach', 'W lesie', 'Inne'])
         gender = st.radio('Płeć', ['Mężczyzna', 'Kobieta'])
 
-        # Zbieranie danych do DataFrame
-        st.session_state['person_df'] = pd.DataFrame([{
-            'age': age,
-            'edu_level': edu_level,
-            'fav_animals': fav_animals,
-            'fav_place': fav_place,
-            'gender': gender,
-        }])
+        # Przycisk zatwierdzający zmiany
+        if st.button('Zatwierdź zmiany'):
 
-        # Przewidywanie klastra na podstawie aktualnych danych
-        cluster_data = predict_model(model, data=st.session_state['person_df'])
+            # Zbieranie danych do DataFrame
+            st.session_state['person_df'] = pd.DataFrame([{
+                'age': age,
+                'edu_level': edu_level,
+                'fav_animals': fav_animals,
+                'fav_place': fav_place,
+                'gender': gender,
+            }])
 
-        st.session_state['predicted_cluster_id'] = cluster_data['Cluster'].values[0]
-        predicted_cluster_data = cluster_names_and_descriptions[st.session_state['predicted_cluster_id']]
+            st.session_state['user_input_source'] = 'sidebar'
+            st.experimental_rerun()
 
-        # Przewidywanie klastra na podstawie aktualnych danych
-        model = get_model()
-        cluster_data = predict_model(model, data=person_df)
+            # # Przewidywanie klastra na podstawie aktualnych danych
+            # cluster_data = predict_model(model, data=st.session_state['person_df'])
 
-        st.session_state['predicted_cluster_id'] = cluster_data['Cluster'].values[0]
-        cluster_names_and_descriptions = get_cluster_names_descriptions()
-        predicted_cluster_data = cluster_names_and_descriptions[st.session_state['predicted_cluster_id']]
+            # st.session_state['predicted_cluster_id'] = cluster_data['Cluster'].values[0]
+            # predicted_cluster_data = cluster_names_and_descriptions[st.session_state['predicted_cluster_id']]
+
+            # # Przewidywanie klastra na podstawie aktualnych danych
+            # model = get_model()
+            # cluster_data = predict_model(model, data=person_df)
+
+            # st.session_state['predicted_cluster_id'] = cluster_data['Cluster'].values[0]
+            # cluster_names_and_descriptions = get_cluster_names_descriptions()
+            # predicted_cluster_data = cluster_names_and_descriptions[st.session_state['predicted_cluster_id']]
